@@ -18,3 +18,11 @@ tokens.csv
 # IDE
 .vscode/
 .idea/
+
+# Smoke-test artifacts (Task 6)
+smoke-tokens.csv
+slow-tokens.csv
+smoke-state.json
+slow-state.json
+smoke-logs/
+slow-logs/
