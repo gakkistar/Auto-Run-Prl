@@ -137,6 +137,43 @@ async def test_request_shutdown_stops_dispatch_and_marks_in_flight_aborted(tmp_p
 
     await asyncio.gather(sched.run(), trigger_shutdown_after_delay())
     recs = store.records()
-    statuses = {r.status for r in recs.values()}
-    assert Status.USED_ABORTED in statuses
+    assert all(
+        r.status == Status.USED_ABORTED for r in recs.values()
+    ), f"expected all aborted, got {[(tid, r.status.value) for tid, r in recs.items()]}"
     assert store.all_terminal()
+
+
+@pytest.mark.asyncio
+async def test_shutdown_after_first_worker_completes_still_aborts_remaining(tmp_path):
+    """Regression: shutdown signal raised AFTER the first worker completes
+    must still trigger graceful shutdown. A single asyncio.wait+branch lets
+    the shutdown signal slip through if a worker happens to finish first."""
+    store = build_store(tmp_path, ["fast", "slow-1", "slow-2"])
+    pool = token_pool(["fast", "slow-1", "slow-2"])
+    sched = Scheduler(
+        store=store,
+        tokens=pool,
+        config=SchedulerConfig(
+            config_path="dummy.py",
+            cmd_template=fake_cmd_template(),
+            log_dir=tmp_path / "logs",
+            max_parallel=3,
+            per_token_env=lambda t: (
+                {"FAKE_SLEEP": "0"} if t.token_id == "fast"
+                else {"FAKE_SLEEP": "20"}
+            ),
+            shutdown_grace_seconds=1,
+        ),
+    )
+
+    async def trigger_after_fast_done():
+        # Give the fast worker a comfortable margin to finish, then signal
+        # shutdown. The two slow workers should still be running.
+        await asyncio.sleep(1.5)
+        sched.request_shutdown()
+
+    await asyncio.gather(sched.run(), trigger_after_fast_done())
+    recs = store.records()
+    assert recs["fast"].status == Status.USED_OK
+    assert recs["slow-1"].status == Status.USED_ABORTED, recs["slow-1"].status
+    assert recs["slow-2"].status == Status.USED_ABORTED, recs["slow-2"].status

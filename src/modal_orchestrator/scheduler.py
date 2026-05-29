@@ -79,7 +79,8 @@ class Scheduler:
     async def _worker(self, token: TokenPair) -> None:
         async with self._sem:
             if self._shutdown.is_set():
-                self.store.mark_aborted(token.token_id)
+                # Shutdown fired while we waited on the semaphore. Leave the
+                # token AVAILABLE so a future run can claim it.
                 return
             await self._work_one(token)
 
@@ -100,19 +101,37 @@ class Scheduler:
         shutdown_task = asyncio.create_task(self._shutdown.wait(), name="shutdown")
         worker_tasks = list(self._in_flight.values())
 
+        async def _gather_workers() -> list:
+            return await asyncio.gather(*worker_tasks, return_exceptions=True)
+
+        all_workers_task = asyncio.create_task(
+            _gather_workers(),
+            name="all-workers",
+        )
         try:
             await asyncio.wait(
-                worker_tasks + [shutdown_task],
+                {all_workers_task, shutdown_task},
                 return_when=asyncio.FIRST_COMPLETED,
             )
 
             if self._shutdown.is_set():
                 await self._graceful_shutdown(worker_tasks)
+                # _graceful_shutdown has already awaited all workers; drain
+                # all_workers_task so it doesn't get cancelled in finally.
+                try:
+                    await all_workers_task
+                except (asyncio.CancelledError, Exception):
+                    pass
             else:
-                pending_workers = [t for t in worker_tasks if not t.done()]
-                if pending_workers:
-                    await asyncio.gather(*pending_workers, return_exceptions=True)
+                # All workers finished naturally.
+                await all_workers_task
         finally:
+            if not all_workers_task.done():
+                all_workers_task.cancel()
+                try:
+                    await all_workers_task
+                except (asyncio.CancelledError, Exception):
+                    pass
             shutdown_task.cancel()
             try:
                 await shutdown_task
