@@ -40,7 +40,7 @@ def _build_parser() -> argparse.ArgumentParser:
                           "element. Use '{config}' as a placeholder for --config. "
                           "Default: ['modal', 'run', '{config}']."))
     pr.add_argument("--retry-aborted", action="store_true",
-                    help="On resume, treat in_flight/aborted tokens as available again.")
+                    help="On resume, treat tokens that were in_flight at crash time as available again. Does not retry used_aborted tokens from a previous run.")
     pr.add_argument("--shutdown-grace", type=float, default=60.0,
                     help="Seconds to wait for in-flight workers on Ctrl+C (default: 60).")
     pr.add_argument("-v", "--verbose", action="store_true")
