@@ -9,6 +9,7 @@ Pass retry_aborted=True to override: in_flight tokens are reset to available.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 from dataclasses import dataclass
@@ -16,6 +17,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Iterable
+
+logger = logging.getLogger(__name__)
 
 
 class Status(str, Enum):
@@ -77,10 +80,16 @@ class StateStore:
         try:
             data = json.loads(self.path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
+            logger.warning(
+                "state file %s is corrupted; starting from empty state",
+                self.path,
+            )
             return
+        transitioned = False
         for token_id, obj in data.get("tokens", {}).items():
             rec = TokenRecord.from_json(token_id, obj)
             if rec.status == Status.IN_FLIGHT:
+                transitioned = True
                 if retry_aborted:
                     rec.status = Status.AVAILABLE
                     rec.claimed_at = None
@@ -88,10 +97,7 @@ class StateStore:
                     rec.status = Status.USED_ABORTED
                     rec.finished_at = _now_iso()
             self._records[token_id] = rec
-        if (
-            any(r.status == Status.USED_ABORTED for r in self._records.values())
-            or retry_aborted
-        ):
+        if transitioned:
             self._flush()
 
     def _flush(self) -> None:
@@ -137,8 +143,16 @@ class StateStore:
     def all_terminal(self) -> bool:
         return all(r.status in TERMINAL for r in self._records.values())
 
+    def _get(self, token_id: str) -> TokenRecord:
+        try:
+            return self._records[token_id]
+        except KeyError:
+            raise KeyError(
+                f"token {token_id!r} not found in state store"
+            ) from None
+
     def claim(self, token_id: str, log_path: str) -> None:
-        rec = self._records[token_id]
+        rec = self._get(token_id)
         rec.status = Status.IN_FLIGHT
         rec.claimed_at = _now_iso()
         rec.log_path = log_path
@@ -147,21 +161,21 @@ class StateStore:
         self._flush()
 
     def mark_ok(self, token_id: str, exit_code: int) -> None:
-        rec = self._records[token_id]
+        rec = self._get(token_id)
         rec.status = Status.USED_OK
         rec.exit_code = exit_code
         rec.finished_at = _now_iso()
         self._flush()
 
     def mark_failed(self, token_id: str, exit_code: int) -> None:
-        rec = self._records[token_id]
+        rec = self._get(token_id)
         rec.status = Status.USED_FAILED
         rec.exit_code = exit_code
         rec.finished_at = _now_iso()
         self._flush()
 
     def mark_aborted(self, token_id: str) -> None:
-        rec = self._records[token_id]
+        rec = self._get(token_id)
         rec.status = Status.USED_ABORTED
         rec.finished_at = _now_iso()
         self._flush()
