@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
@@ -65,12 +64,13 @@ async def run_one(
                 proc.terminate()
             except ProcessLookupError:
                 pass
+            # 15s on Windows: ProactorEventLoop subprocess teardown is slower than POSIX.
             try:
                 await asyncio.wait_for(proc.wait(), timeout=15)
             except asyncio.TimeoutError:
                 try:
                     proc.kill()
-                except ProcessLookupError:
+                except (ProcessLookupError, OSError):
                     pass
                 await proc.wait()
             raise

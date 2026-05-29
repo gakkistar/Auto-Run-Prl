@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -74,7 +75,6 @@ async def test_env_does_not_leak_overrides_into_parent_process(tmp_path, monkeyp
         cmd_template=fake_cmd_template(),
         log_path=log_dir / "x.log",
     )
-    import os
     assert os.environ.get("MODAL_TOKEN_ID") is None
 
 
