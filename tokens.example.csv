@@ -1,0 +1,6 @@
+# Modal workspace tokens — one per line, comma-separated.
+# Copy this file to tokens.csv and fill in real values.
+# The orchestrator will skip blank lines and # comments.
+# token_id,token_secret
+ak-EXAMPLE1234567890,as-EXAMPLE0987654321
+ak-EXAMPLE2345678901,as-EXAMPLE1098765432
