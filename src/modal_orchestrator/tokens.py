@@ -31,7 +31,10 @@ def load_tokens(path: Path | str) -> list[TokenPair]:
     pairs: list[TokenPair] = []
     seen_ids: set[str] = set()
 
-    with p.open("r", encoding="utf-8") as f:
+    # utf-8-sig strips a leading BOM if present (common when the CSV is
+    # produced by PowerShell `Set-Content -Encoding utf8` on Windows) and
+    # behaves identically to utf-8 otherwise.
+    with p.open("r", encoding="utf-8-sig") as f:
         lines = f.readlines()
 
     header_consumed = False

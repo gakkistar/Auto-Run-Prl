@@ -60,3 +60,14 @@ def test_raises_on_empty_field(tmp_path):
 def test_missing_file_raises_filenotfound(tmp_path):
     with pytest.raises(FileNotFoundError):
         load_tokens(tmp_path / "does-not-exist.csv")
+
+
+def test_strips_utf8_bom_from_first_line(tmp_path):
+    """PowerShell 5.1 `Set-Content -Encoding utf8` writes a UTF-8 BOM.
+    The loader must transparently strip it from the first token_id."""
+    p = tmp_path / "tokens.csv"
+    p.write_bytes(b"\xef\xbb\xbfak-1,as-1\nak-2,as-2\n")
+    assert load_tokens(p) == [
+        TokenPair("ak-1", "as-1"),
+        TokenPair("ak-2", "as-2"),
+    ]
