@@ -20,6 +20,8 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="modal-orchestrator",
         description="Run a Modal workload across many workspace tokens.",
     )
+    # dest="subcommand" (not "cmd") avoids a Namespace collision with the
+    # --cmd flag in the "run" subparser, which also lands in args.cmd.
     sub = p.add_subparsers(dest="subcommand", required=True)
 
     pr = sub.add_parser("run", help="Run the orchestrator over a token pool.")
@@ -162,8 +164,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"State file: {args.state}")
         print(f"Total tokens: {total}")
         for status, n in counts.items():
-            print(f"  {status}: {n}")
+            if n:
+                print(f"  {status}: {n}")
         return 0
-    else:
+    else:  # pragma: no cover — argparse required=True exits before reaching here
         parser.print_help()
         return 2
