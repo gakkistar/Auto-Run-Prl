@@ -3,8 +3,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
-
 
 @dataclass(frozen=True)
 class TokenPair:
@@ -42,12 +40,12 @@ def load_tokens(path: Path | str) -> list[TokenPair]:
         if not stripped or stripped.startswith("#"):
             continue
 
-        if not header_consumed and stripped.lower() == "token_id,token_secret":
+        if not header_consumed and stripped == "token_id,token_secret":
             header_consumed = True
             continue
         header_consumed = True  # only the first eligible line can be a header
 
-        parts = [p.strip() for p in stripped.split(",")]
+        parts = [col.strip() for col in stripped.split(",")]
         if len(parts) != 2 or not parts[0] or not parts[1]:
             raise MalformedTokenLine(
                 f"line {line_no}: expected 'token_id,token_secret', got {raw!r}"
