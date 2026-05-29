@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+.pytest_cache/
+
+# Project artifacts (must not commit secrets)
+state.json
+state.json.tmp
+logs/
+tokens.csv
+*.log
+
+# IDE
+.vscode/
+.idea/
