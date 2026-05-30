@@ -12,7 +12,7 @@ import json
 import logging
 import os
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
@@ -135,7 +135,10 @@ class StateStore:
             self._flush()
 
     def records(self) -> dict[str, TokenRecord]:
-        return dict(self._records)
+        # Copy values too: TokenRecord fields can be mutated by concurrent
+        # workers between when the dashboard requests state and when it
+        # finishes serializing, producing half-updated records.
+        return {tid: replace(rec) for tid, rec in self._records.items()}
 
     def claimable_ids(self) -> list[str]:
         return [tid for tid, r in self._records.items() if r.status == Status.AVAILABLE]

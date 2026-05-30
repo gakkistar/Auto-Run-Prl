@@ -1,6 +1,7 @@
 """Read-only aiohttp web dashboard for live orchestrator progress."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import json
 from pathlib import Path
@@ -165,10 +166,7 @@ setInterval(poll, 2000);
 
 def _build_app(store, log_dir: Path):
     """Build and return the aiohttp Application."""
-    try:
-        from aiohttp import web
-    except ImportError:
-        raise
+    from aiohttp import web
 
     routes = web.RouteTableDef()
 
@@ -235,7 +233,9 @@ def _build_app(store, log_dir: Path):
                 charset="utf-8",
             )
         try:
-            text = log_file.read_text(encoding="utf-8", errors="replace")
+            text = await asyncio.to_thread(
+                log_file.read_text, encoding="utf-8", errors="replace"
+            )
             lines = text.splitlines()
             tail = "\n".join(lines[-_LOG_TAIL_LINES:])
         except OSError as exc:
@@ -261,10 +261,12 @@ async def start_dashboard(
 
     Returns None if aiohttp can't bind (port in use, etc.).
     """
-    try:
-        from aiohttp import web
-    except ImportError:
-        raise
+    if host not in ("127.0.0.1", "::1", "localhost"):
+        logger.warning(
+            "Dashboard bound to %s — visible on all interfaces. No auth.", host
+        )
+
+    from aiohttp import web
 
     app = _build_app(store, log_dir)
     runner = web.AppRunner(app)

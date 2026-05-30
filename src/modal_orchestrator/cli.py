@@ -96,9 +96,10 @@ async def _run_async(args: argparse.Namespace) -> int:
 
     # Optionally start the dashboard before the scheduler runs.
     dashboard_runner = None
+    stop_dashboard = None  # populated below if --dashboard is passed
     if args.dashboard:
         try:
-            from .dashboard import start_dashboard, stop_dashboard  # noqa: F401
+            from .dashboard import start_dashboard, stop_dashboard
         except ImportError:
             print(
                 "dashboard requires the 'dashboard' extra: pip install -e '.[dashboard]'",
@@ -163,8 +164,10 @@ async def _run_async(args: argparse.Namespace) -> int:
                 signal.signal(signal.SIGINT, previous_handler)
             except (ValueError, TypeError):
                 pass
-        if dashboard_runner is not None:
-            from .dashboard import stop_dashboard
+        if dashboard_runner is not None and stop_dashboard is not None:
+            # stop_dashboard was imported in the if-block above; it's in
+            # function scope because Python function locals are visible
+            # across the function body once assigned.
             await stop_dashboard(dashboard_runner)
 
     counts = store.counts()
