@@ -43,6 +43,12 @@ def _build_parser() -> argparse.ArgumentParser:
                     help="On resume, treat tokens that were in_flight at crash time as available again. Does not retry used_aborted tokens from a previous run.")
     pr.add_argument("--shutdown-grace", type=float, default=60.0,
                     help="Seconds to wait for in-flight workers on Ctrl+C (default: 60).")
+    pr.add_argument("--dashboard", action="store_true",
+                    help="Launch a local read-only web dashboard alongside the orchestrator.")
+    pr.add_argument("--dashboard-host", default="127.0.0.1",
+                    help="Bind address for the dashboard (default: 127.0.0.1).")
+    pr.add_argument("--dashboard-port", type=int, default=8000,
+                    help="Port for the dashboard (default: 8000).")
     pr.add_argument("-v", "--verbose", action="store_true")
 
     ps = sub.add_parser("status", help="Print current counts from a state file.")
@@ -87,6 +93,29 @@ async def _run_async(args: argparse.Namespace) -> int:
             shutdown_grace_seconds=args.shutdown_grace,
         ),
     )
+
+    # Optionally start the dashboard before the scheduler runs.
+    dashboard_runner = None
+    if args.dashboard:
+        try:
+            from .dashboard import start_dashboard, stop_dashboard  # noqa: F401
+        except ImportError:
+            print(
+                "dashboard requires the 'dashboard' extra: pip install -e '.[dashboard]'",
+                file=sys.stderr,
+            )
+            return 2
+        dashboard_runner = await start_dashboard(
+            store=store,
+            host=args.dashboard_host,
+            port=args.dashboard_port,
+            log_dir=args.logs,
+        )
+        if dashboard_runner is not None:
+            print(
+                f"Dashboard: http://{args.dashboard_host}:{args.dashboard_port}/",
+                file=sys.stderr,
+            )
 
     # Cross-platform Ctrl+C: install a signal handler that asks the scheduler
     # to wind down. asyncio.run on Windows would otherwise convert SIGINT into
@@ -134,6 +163,9 @@ async def _run_async(args: argparse.Namespace) -> int:
                 signal.signal(signal.SIGINT, previous_handler)
             except (ValueError, TypeError):
                 pass
+        if dashboard_runner is not None:
+            from .dashboard import stop_dashboard
+            await stop_dashboard(dashboard_runner)
 
     counts = store.counts()
     print("Final counts:")

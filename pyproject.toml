@@ -12,9 +12,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+dashboard = [
+    "aiohttp>=3.9",
+]
 dev = [
     "pytest>=7",
     "pytest-asyncio>=0.21",
+    "aiohttp>=3.9",
 ]
 
 [project.scripts]

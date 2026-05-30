@@ -88,6 +88,28 @@ python -m modal_orchestrator status --state state.json
 
 Prints the count of tokens in each non-zero status.
 
+## Live dashboard
+
+Pass `--dashboard` to launch a local read-only web dashboard alongside the
+orchestrator:
+
+```powershell
+pip install -e ".[dashboard]"   # one-time
+python -m modal_orchestrator run `
+    --tokens tokens.csv `
+    --config your_app.py `
+    --dashboard
+```
+
+By default it binds to `127.0.0.1:8000`. Override with `--dashboard-host` and
+`--dashboard-port`. The page polls every 2 seconds and shows each token's
+status, timing, and an inline view of its log file. The dashboard exposes no
+control actions — it is observational only and ships with no authentication.
+Do not bind it to a public interface.
+
+If aiohttp can't bind (e.g., port in use), the orchestrator logs a warning and
+runs without the dashboard.
+
 ## Failure model
 
 Modal's free credit is around $30 per workspace and runs out after roughly 1-2
